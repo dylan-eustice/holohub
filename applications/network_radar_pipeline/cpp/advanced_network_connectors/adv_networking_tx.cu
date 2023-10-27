@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "adv_networking_tx.h"
+#include "adv_networking_tx.h"  //todo: Rename networking connectors
 
 namespace holoscan::ops {
 
@@ -85,71 +85,71 @@ void AdvConnectorOpTx::compute(InputContext& op_input,
   HOLOSCAN_LOG_INFO("AdvConnectorOpTx::compute()");
   AdvNetStatus ret;
 
-  // Input is pulse/sample data from a single channel
-  auto rf_data = op_input.receive<std::shared_ptr<RFChannel>>("rf_in").value();
+  // // Input is pulse/sample data from a single channel
+  // auto rf_data = op_input.receive<std::shared_ptr<RFChannel>>("rf_in").value();
 
-  /**
-   * Spin waiting until a buffer is free. This can be stalled by sending
-   * faster than the NIC can handle it. We expect the transmit operator to
-   * operate much faster than the receiver since it's not having to do any
-   * work to construct packets, and just copying from a buffer into memory.
-  */
-  while (!adv_net_tx_burst_available(num_packets_buf)) {}
+  // /**
+  //  * Spin waiting until a buffer is free. This can be stalled by sending
+  //  * faster than the NIC can handle it. We expect the transmit operator to
+  //  * operate much faster than the receiver since it's not having to do any
+  //  * work to construct packets, and just copying from a buffer into memory.
+  // */
+  // while (!adv_net_tx_burst_available(num_packets_buf)) {}
 
-  auto msg = CreateSharedBurstParams();
-  adv_net_set_hdr(msg, port_id, queue_id, num_packets_buf);
+  // auto msg = CreateSharedBurstParams();
+  // adv_net_set_hdr(msg, port_id, queue_id, num_packets_buf);
 
-  if ((ret = adv_net_get_tx_pkt_burst(msg)) != AdvNetStatus::SUCCESS) {
-    HOLOSCAN_LOG_ERROR("Error returned from adv_net_get_tx_pkt_burst: {}",
-      static_cast<int>(ret));
-    return;
-  }
+  // if ((ret = adv_net_get_tx_pkt_burst(msg)) != AdvNetStatus::SUCCESS) {
+  //   HOLOSCAN_LOG_ERROR("Error returned from adv_net_get_tx_pkt_burst: {}",
+  //     static_cast<int>(ret));
+  //   return;
+  // }
 
-  // Generate packets from RF data //todo Optimize this process
-  index_t ix_buf = 0;
-  index_t ix_max = static_cast<index_t>(numSamples.get());
-  for (index_t ix_pulse = 0; ix_pulse < numPulses.get(); ix_pulse++) {
-    for (index_t ix_sample = 0; ix_sample < numSamples.get(); ix_sample += samples_per_pkt) {
-      // Slice to the samples this packet will send
-      auto data = rf_data->data.Slice<1>(
-        {ix_pulse, ix_sample},
-        {matxDropDim, std::min(ix_sample + samples_per_pkt, ix_max)});
+  // // Generate packets from RF data //todo Optimize this process
+  // index_t ix_buf = 0;
+  // index_t ix_max = static_cast<index_t>(numSamples.get());
+  // for (index_t ix_pulse = 0; ix_pulse < numPulses.get(); ix_pulse++) {
+  //   for (index_t ix_sample = 0; ix_sample < numSamples.get(); ix_sample += samples_per_pkt) {
+  //     // Slice to the samples this packet will send
+  //     auto data = rf_data->data.Slice<1>(
+  //       {ix_pulse, ix_sample},
+  //       {matxDropDim, std::min(ix_sample + samples_per_pkt, ix_max)});
 
-      // Use accessor functions to set payload
-      packets_buf[ix_buf].set_waveform_id(rf_data->waveform_id);
-      packets_buf[ix_buf].set_sample_idx(ix_sample);
-      packets_buf[ix_buf].set_channel_idx(rf_data->channel_id);
-      packets_buf[ix_buf].set_pulse_idx(ix_pulse);
-      packets_buf[ix_buf].set_num_samples(data.Size(0));
-      packets_buf[ix_buf].set_end_array(0);
-      packets_buf[ix_buf].set_payload(data.Data(), rf_data->stream);
-      ix_buf++;
-    }
-  }
-  if (num_packets_buf != ix_buf) {
-    HOLOSCAN_LOG_ERROR("Not sending expected number of packets");
-  }
+  //     // Use accessor functions to set payload
+  //     packets_buf[ix_buf].set_waveform_id(rf_data->waveform_id);
+  //     packets_buf[ix_buf].set_sample_idx(ix_sample);
+  //     packets_buf[ix_buf].set_channel_idx(rf_data->channel_id);
+  //     packets_buf[ix_buf].set_pulse_idx(ix_pulse);
+  //     packets_buf[ix_buf].set_num_samples(data.Size(0));
+  //     packets_buf[ix_buf].set_end_array(0);
+  //     packets_buf[ix_buf].set_payload(data.Data(), rf_data->stream);
+  //     ix_buf++;
+  //   }
+  // }
+  // if (num_packets_buf != ix_buf) {
+  //   HOLOSCAN_LOG_ERROR("Not sending expected number of packets");
+  // }
 
-  // Send end-of-array message if this is the last channel of the transmit
-  const bool send_eoa_msg = rf_data->channel_id == (numChannels.get() - 1);
-  if (send_eoa_msg) {
-    packets_buf[num_packets_buf - 1].set_end_array(1);
-  }
+  // // Send end-of-array message if this is the last channel of the transmit
+  // const bool send_eoa_msg = rf_data->channel_id == (numChannels.get() - 1);
+  // if (send_eoa_msg) {
+  //   packets_buf[num_packets_buf - 1].set_end_array(1);
+  // }
 
-  // Transmit
-  for (int pkt_idx = 0; pkt_idx < msg->hdr.num_pkts; pkt_idx++) {
-    if ((ret = adv_net_set_cpu_udp_payload(
-      msg,
-      pkt_idx,
-      packets_buf[pkt_idx].get_ptr(),
-      buf_stride)) != AdvNetStatus::SUCCESS) {
-      HOLOSCAN_LOG_ERROR("Failed to create packet {}", pkt_idx);
-    }
-  }
-  HOLOSCAN_LOG_INFO("AdvConnectorOpTx sending {} packets...", msg->hdr.num_pkts);
-  op_output.emit(msg, "burst_out");
+  // // Transmit
+  // for (int pkt_idx = 0; pkt_idx < msg->hdr.num_pkts; pkt_idx++) {
+  //   if ((ret = adv_net_set_cpu_udp_payload(
+  //     msg,
+  //     pkt_idx,
+  //     packets_buf[pkt_idx].get_ptr(),
+  //     buf_stride)) != AdvNetStatus::SUCCESS) {
+  //     HOLOSCAN_LOG_ERROR("Failed to create packet {}", pkt_idx);
+  //   }
+  // }
+  // HOLOSCAN_LOG_INFO("AdvConnectorOpTx sending {} packets...", msg->hdr.num_pkts);
+  // op_output.emit(msg, "burst_out");
 
-  HOLOSCAN_LOG_INFO("AdvConnectorOpTx::compute() done");
+  // HOLOSCAN_LOG_INFO("AdvConnectorOpTx::compute() done");
 }
 
 }  // namespace holoscan::ops
